@@ -65,6 +65,7 @@
       "fallbackCurrentVersionResolver": "disk"
     },
     "changelog": {
+      "automaticFromRef": true,
       "projectChangelogs": {
         "createRelease": "github",
         "entryWhenNoChanges": false
