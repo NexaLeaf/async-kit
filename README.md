@@ -543,66 +543,58 @@ npx nx run @async-kit/flowx:lint
 
 This monorepo uses [`nx release`](https://nx.dev/features/manage-releases) with **independent versioning** — each package can be on a different version.
 
-### Workflow overview
+### How it works — fully automatic
+
+**Every push to `main` triggers a publish.** No manual clicking required.
 
 ```
-Push to main  ──────────────────────────────────────────────────────────────►
-                    ┌─────────────────────────────────────────────────────┐
-                    │  CI (ci.yml)                                        │
-                    │  npm audit → lint → typecheck → test → build        │
-                    └─────────────────────────────────────────────────────┘
-                                            │
-                         commit msg contains [release]?
-                                    │ yes
-                                    ▼
-                    ┌─────────────────────────────────────────────────────┐
-                    │  Release (release.yml)  — environment: npm-publish  │
-                    │  1. npm audit + full test + build                   │
-                    │  2. nx release --skip-publish  (bump + tag + log)   │
-                    │  3. nx release publish  (npm + OIDC provenance)     │
-                    │  4. git push --follow-tags → main                   │
-                    └─────────────────────────────────────────────────────┘
-
-Manual trigger:  Actions → Release → Run workflow
-                 Inputs: dry_run | package | first_release
+push to main
+    │
+    ▼
+┌──────────────────────────────────────────────────┐
+│  validate                                        │
+│  npm audit → typecheck → test → build            │
+│  uploads dist/ artifact                          │
+└──────────────────────────────────────────────────┘
+    │  passes
+    ▼
+┌──────────────────────────────────────────────────┐
+│  publish  (environment: npm-publish)             │
+│  1. nx release --skip-publish                    │
+│     → bump versions (conventional commits)       │
+│     → write CHANGELOG.md                        │
+│     → create git tag per package                 │
+│  2. nx release publish                           │
+│     → npm publish with OIDC provenance           │
+│  3. git push --follow-tags → main                │
+└──────────────────────────────────────────────────┘
 ```
 
-### How to cut a release
+The **`npm-publish` GitHub Environment** is the single control point:
 
-**Option A — Automated (recommended)**
-
-1. Write commits following [Conventional Commits](https://www.conventionalcommits.org/):
-   ```
-   feat(retryx): add decorrelated jitter strategy
-   fix(limitx): drain() resolves when queue empties mid-flight
-   feat!: drop Node 16 support (BREAKING CHANGE)
-   ```
-
-2. When ready to publish, include `[release]` in any commit message pushed to `main`:
-   ```bash
-   git commit --allow-empty -m "chore: cut release [release]"
-   git push
-   ```
-   The workflow detects the marker, runs validation, then publishes.
-
-**Option B — Manual dispatch**
-
-Go to **Actions → Release → Run workflow** and fill in:
-
-| Input | Description |
+| Environment config | Behaviour |
 |---|---|
-| `dry_run` | Preview version bumps + changelog without publishing |
-| `package` | Scope to one package, e.g. `@async-kit/limitx` |
-| `first_release` | Use for the very first publish (`--first-release`) |
+| No required reviewers | Fully automatic — publishes immediately after tests pass |
+| Required reviewers added | One-click approval prompt appears in Actions UI before publish |
 
-### Version bump rules
+### Manual dispatch (optional)
+
+Go to **Actions → Release → Run workflow** for special cases:
+
+| Input | Use case |
+|---|---|
+| `dry_run: true` | Preview version bumps + changelog without touching npm |
+| `package: @async-kit/limitx` | Publish only one package |
+| `first_release: true` | Very first publish — skips changelog diff |
+
+### Version bump rules (Conventional Commits)
 
 | Commit type | Version bump |
 |---|---|
 | `fix:` | patch |
 | `feat:` | minor |
 | `feat!:` or `BREAKING CHANGE:` | major |
-| `docs:`, `chore:`, `ci:`, `build:` | none (no release) |
+| `docs:`, `chore:`, `ci:`, `build:` | none — no release |
 
 ### Git tags produced
 
@@ -613,34 +605,25 @@ Go to **Actions → Release → Run workflow** and fill in:
 @async-kit/ratelimitx@1.0.1
 ```
 
-### One-time setup — required secrets & environment
+### One-time setup
 
-#### 1. Secrets  (`Settings → Secrets and variables → Actions`)
+#### 1. Secrets — `Settings → Secrets and variables → Actions`
 
-| Secret | How to get it |
+| Secret | How to create |
 |---|---|
-| `NPM_TOKEN` | npmjs.com → **Avatar → Access Tokens → Generate New Token → Automation** |
-| `RELEASE_TOKEN` | GitHub → **Settings → Developer settings → Personal access tokens (classic)** — scopes: `repo`, `workflow` |
+| `NPM_TOKEN` | npmjs.com → Avatar → **Access Tokens → Automation** |
+| `RELEASE_TOKEN` | GitHub → Settings → **Developer settings → PAT (classic)** — scopes: `repo`, `workflow` |
 
-#### 2. GitHub Environment  (`Settings → Environments → New environment`)
+#### 2. GitHub Environment — `Settings → Environments → New environment`
 
-Create an environment named **`npm-publish`** and add:
-- **Required reviewers** — at least one team member who must approve before every publish
-- *(Optional)* **Deployment branches** — restrict to `main` only
+Create an environment named **`npm-publish`**.
 
-This gates every real publish behind a human sign-off. Dry-run jobs bypass the environment intentionally.
+- **Leave reviewers empty** → publishes automatically after every push to `main` that passes tests. Zero clicks.
+- **Add required reviewers** → a one-click approval prompt appears in Actions before each publish. You still don't need to trigger anything manually — just approve.
 
-#### 3. Verify OIDC provenance is enabled
+#### 3. npm provenance
 
-In your npm organisation:
-**npmjs.com → Organisation → Settings → Publishing → Require two-factor authentication for publish**
-and ensure **"Allow publishing with granular tokens"** is on.
-
-Provenance is attached automatically via `NPM_CONFIG_PROVENANCE=true` in the workflow — no extra steps needed.
-
-### npm provenance
-
-Every published package includes a signed [provenance statement](https://docs.npmjs.com/generating-provenance-statements) linking the package to this exact commit and workflow run. Consumers can verify with:
+Provenance is attached automatically (`NPM_CONFIG_PROVENANCE=true`). Consumers can verify:
 
 ```bash
 npm audit signatures @async-kit/limitx
