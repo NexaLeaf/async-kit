@@ -1,8 +1,15 @@
 {
   "name": "@async-kit/flowx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Composable async pipeline builder for JavaScript/TypeScript",
-  "keywords": ["async", "pipeline", "flow", "stream", "compose", "transform"],
+  "keywords": [
+    "async",
+    "pipeline",
+    "flow",
+    "stream",
+    "compose",
+    "transform"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,7 +35,11 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",

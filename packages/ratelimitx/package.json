@@ -1,8 +1,14 @@
 {
   "name": "@async-kit/ratelimitx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Token bucket and sliding window rate limiter for JavaScript/TypeScript",
-  "keywords": ["rate-limit", "token-bucket", "sliding-window", "throttle", "api"],
+  "keywords": [
+    "rate-limit",
+    "token-bucket",
+    "sliding-window",
+    "throttle",
+    "api"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,7 +34,11 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",

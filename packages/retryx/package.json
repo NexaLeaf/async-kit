@@ -1,8 +1,15 @@
 {
   "name": "@async-kit/retryx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Smart async retry system with exponential backoff, jitter, and circuit breaker for JavaScript/TypeScript",
-  "keywords": ["async", "retry", "backoff", "circuit-breaker", "resilience", "fault-tolerance"],
+  "keywords": [
+    "async",
+    "retry",
+    "backoff",
+    "circuit-breaker",
+    "resilience",
+    "fault-tolerance"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,7 +35,11 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
