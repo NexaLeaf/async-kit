@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(npx nx:*)",
+      "Bash(node -e \"const nx = require\\('./node_modules/@nx/eslint/index.js'\\); console.log\\(Object.keys\\(nx\\)\\)\")",
+      "Bash(node -e \"\nconst nx = require\\('./node_modules/@nx/eslint/src/flat-configs/index.js'\\);\nconsole.log\\(Object.keys\\(nx\\)\\);\n\" 2>&1 || ls node_modules/@nx/eslint/src/)",
+      "Bash(node -e \"\ntry {\n  const nx = require\\('./node_modules/@nx/eslint'\\);\n  console.log\\('main:', Object.keys\\(nx\\)\\);\n} catch\\(e\\) { console.error\\(e.message\\); }\n\" && node -e \"\ntry {\n  const nx = require\\('./node_modules/@nx/eslint/src/utils/flat-config/exports.js'\\);\n  console.log\\('flat:', Object.keys\\(nx\\)\\);\n} catch\\(e\\) { console.error\\('flat:', e.message\\); }\n\")",
+      "Bash(node -e \"const m = require\\('./node_modules/@nx/eslint/src/utils/flat-config.js'\\); console.log\\(Object.keys\\(m\\)\\)\" 2>&1)",
+      "Bash(node -e \"\nconst fs = require\\('fs'\\);\nconst files = fs.readdirSync\\('./node_modules/@nx/eslint'\\).filter\\(f => !f.startsWith\\('.'\\)\\);\nconsole.log\\(files.join\\('\\\\n'\\)\\);\n\")",
+      "Bash(node -e \"require\\('./node_modules/typescript-eslint/index.js'\\)\" 2>&1 | head -5)",
+      "Bash(wc -l /Users/palanisamy.muthusamy/dev/reachout/async-kit/README.md && wc -l /Users/palanisamy.muthusamy/dev/reachout/async-kit/packages/*/README.md)",
+      "Bash(nvm install:*)",
+      "Bash(source ~/.nvm/nvm.sh && nvm use 24 && node --version && npm --version)",
+      "Bash(source ~/.nvm/nvm.sh && nvm use 24 && npx nx run-many -t build,test --all --parallel=4 2>&1 | grep -E \"\\(PASS|FAIL|✓|✗|Successfully|Error\\)\" | grep -v \"^$\")",
+      "Bash(source ~/.nvm/nvm.sh && nvm use 24 && npm audit 2>&1 | tail -20)",
+      "Bash(npm audit:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

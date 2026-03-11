@@ -1,0 +1,82 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "npmScope": "async-kit",
+  "defaultBase": "main",
+  "plugins": [
+    {
+      "plugin": "@nx/jest/plugin",
+      "options": {
+        "targetName": "test"
+      }
+    }
+  ],
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "cache": true
+    },
+    "test": {
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js"],
+      "cache": true
+    },
+    "lint": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/eslint.config.mjs",
+        "{workspaceRoot}/.prettierignore"
+      ],
+      "cache": true
+    },
+    "typecheck": {
+      "inputs": ["default", "^production"],
+      "outputs": ["{projectRoot}/tmp/typecheck"],
+      "cache": true
+    }
+  },
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "sharedGlobals": [
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/nx.json"
+    ],
+    "production": [
+      "default",
+      "!{projectRoot}/**/*.spec.ts",
+      "!{projectRoot}/**/*.test.ts",
+      "!{projectRoot}/jest.config.ts",
+      "!{projectRoot}/eslint.config.mjs",
+      "!{projectRoot}/**/*.md"
+    ]
+  },
+  "release": {
+    "projects": ["packages/*"],
+    "projectsRelationship": "independent",
+    "git": {
+      "commit": true,
+      "commitMessage": "chore(release): publish {version}",
+      "tag": true,
+      "tagPattern": "{projectName}@{version}"
+    },
+    "version": {
+      "conventionalCommits": true,
+      "versionPrefix": ""
+    },
+    "changelog": {
+      "projectChangelogs": {
+        "createRelease": "github",
+        "entryWhenNoChanges": false
+      },
+      "workspaceChangelog": false
+    },
+    "conventionalCommits": {
+      "types": {
+        "docs": { "semverBump": "none" },
+        "chore": { "changelog": false },
+        "ci": { "changelog": false },
+        "build": { "changelog": false }
+      }
+    }
+  }
+}

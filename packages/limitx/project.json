@@ -1,0 +1,36 @@
+{
+  "name": "@async-kit/limitx",
+  "sourceRoot": "packages/limitx/src",
+  "projectType": "library",
+  "tags": ["scope:limitx", "type:lib"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "../../node_modules/.bin/tsup",
+        "cwd": "packages/limitx"
+      },
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "cache": true
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "../../node_modules/.bin/tsc -p tsconfig.lib.json --noEmit",
+        "cwd": "packages/limitx"
+      },
+      "inputs": ["default", "^production"],
+      "cache": true
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm publish --access public",
+        "cwd": "packages/limitx"
+      },
+      "dependsOn": ["build"]
+    }
+  }
+}

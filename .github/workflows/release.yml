@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no publish, no git push)'
+        type: boolean
+        default: false
+      package:
+        description: 'Package to release (leave empty for all changed)'
+        type: string
+        required: false
+
+permissions:
+  contents: write      # git commits + tags
+  id-token: write      # npm provenance via OIDC
+  pull-requests: write # GitHub Release creation
+
+jobs:
+  release:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    environment: npm-publish  # Requires manual approval in GitHub Environments
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure git identity
+        run: |
+          git config user.email "release-bot@async-kit.dev"
+          git config user.name "async-kit release bot"
+
+      - name: Build all packages
+        run: npx nx run-many -t build --all --parallel=4
+
+      - name: Release (dry run)
+        if: ${{ inputs.dry_run }}
+        run: npx nx release --dry-run ${{ inputs.package && format('--projects={0}', inputs.package) || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release
+        if: ${{ !inputs.dry_run }}
+        run: npx nx release ${{ inputs.package && format('--projects={0}', inputs.package) || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

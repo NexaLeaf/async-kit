@@ -1,0 +1,29 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "baseUrl": ".",
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "useDefineForClassFields": true,
+    "importHelpers": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@async-kit/limitx": ["packages/limitx/src/index.ts"],
+      "@async-kit/retryx": ["packages/retryx/src/index.ts"],
+      "@async-kit/flowx": ["packages/flowx/src/index.ts"],
+      "@async-kit/ratelimitx": ["packages/ratelimitx/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp", "dist", "**/*.js"]
+}

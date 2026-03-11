@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  main:
+    name: NX Affected
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive SHAs for nx affected
+        uses: nrwl/nx-set-shas@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore NX cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: Lint affected
+        run: npx nx affected -t lint --base=$NX_BASE --head=$NX_HEAD --parallel=3
+
+      - name: Type-check affected
+        run: npx nx affected -t typecheck --base=$NX_BASE --head=$NX_HEAD --parallel=3
+
+      - name: Test affected
+        run: npx nx affected -t test --base=$NX_BASE --head=$NX_HEAD --parallel=3 --coverage
+
+      - name: Build affected
+        run: npx nx affected -t build --base=$NX_BASE --head=$NX_HEAD --parallel=3

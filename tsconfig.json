@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./packages/limitx" },
+    { "path": "./packages/retryx" },
+    { "path": "./packages/flowx" },
+    { "path": "./packages/ratelimitx" }
+  ]
+}
