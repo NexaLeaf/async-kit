@@ -1,27 +1,132 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Release workflow — version bump + npm publish + GitHub Release
+#
+# Triggers
+#   • Manual:  Actions → Release → Run workflow
+#              Inputs: dry_run (bool), package (string, optional)
+#   • Auto:    Push to `main` when a commit message contains
+#              "[release]" — e.g. "chore: bump deps [release]"
+#
+# Required secrets (Settings → Secrets → Actions)
+#   NPM_TOKEN      — npm automation token  (npmjs.com → Access Tokens → Automation)
+#   RELEASE_TOKEN  — GitHub PAT with `repo` + `workflow` scopes
+#                    (needed to push release commits to protected main)
+#
+# Required GitHub Environment  (Settings → Environments → npm-publish)
+#   Add required reviewers so every real publish needs a human sign-off.
+#   Dry-run jobs skip the environment gate intentionally.
+# ─────────────────────────────────────────────────────────────────────────────
+
 name: Release
 
 on:
+  # ── Manual trigger ──────────────────────────────────────────────────────────
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (no publish, no git push)'
+        description: 'Dry run — show what would be published without making changes'
         type: boolean
         default: false
       package:
-        description: 'Package to release (leave empty for all changed)'
+        description: 'Scope release to one package, e.g. @async-kit/limitx (leave empty for all changed)'
         type: string
         required: false
+      first_release:
+        description: 'First-ever release — skips changelog diff, sets initial version'
+        type: boolean
+        default: false
 
+  # ── Auto-trigger on [release] commits pushed to main ────────────────────────
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/ci.yml'
+
+# ─── Permissions ──────────────────────────────────────────────────────────────
 permissions:
-  contents: write      # git commits + tags
-  id-token: write      # npm provenance via OIDC
-  pull-requests: write # GitHub Release creation
+  contents: write       # push release commits + tags
+  id-token: write       # npm OIDC provenance
+  pull-requests: write  # create GitHub Releases
+
+# ─── Cancel in-progress releases if a new one is triggered ────────────────────
+concurrency:
+  group: release
+  cancel-in-progress: false   # never cancel a publish mid-flight
 
 jobs:
-  release:
-    name: Publish to npm
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 1. Guard — only proceed on push when commit contains [release]
+  # ═══════════════════════════════════════════════════════════════════════════
+  should-release:
+    name: Check release intent
     runs-on: ubuntu-latest
-    environment: npm-publish  # Requires manual approval in GitHub Environments
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - name: Decide whether to proceed
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          elif echo "${{ github.event.head_commit.message }}" | grep -qF "[release]"; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 2. Validate — full test + build before touching the registry
+  # ═══════════════════════════════════════════════════════════════════════════
+  validate:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    needs: should-release
+    if: needs.should-release.outputs.proceed == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+
+      - name: Type-check all packages
+        run: npx nx run-many -t typecheck --all --parallel=4
+
+      - name: Test all packages
+        run: npx nx run-many -t test --all --parallel=4
+
+      - name: Build all packages
+        run: npx nx run-many -t build --all --parallel=4
+
+      # Upload build artifacts so the publish job doesn't rebuild
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-packages
+          path: packages/*/dist
+          retention-days: 1
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 3a. Dry Run — show version bumps + changelog without publishing
+  # ═══════════════════════════════════════════════════════════════════════════
+  dry-run:
+    name: Dry Run (preview)
+    runs-on: ubuntu-latest
+    needs: validate
+    if: >
+      needs.validate.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)
 
     steps:
       - uses: actions/checkout@v4
@@ -38,23 +143,100 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Restore dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: packages
+
       - name: Configure git identity
         run: |
           git config user.email "release-bot@async-kit.dev"
           git config user.name "async-kit release bot"
 
-      - name: Build all packages
-        run: npx nx run-many -t build --all --parallel=4
-
-      - name: Release (dry run)
-        if: ${{ inputs.dry_run }}
-        run: npx nx release --dry-run ${{ inputs.package && format('--projects={0}', inputs.package) || '' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Release
-        if: ${{ !inputs.dry_run }}
-        run: npx nx release ${{ inputs.package && format('--projects={0}', inputs.package) || '' }}
+      - name: nx release — dry run
+        run: |
+          npx nx release \
+            --dry-run \
+            ${{ inputs.first_release && '--first-release' || '' }} \
+            ${{ inputs.package && format('--projects={0}', inputs.package) || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 3b. Publish — bump versions, tag, push changelog, publish to npm
+  # ═══════════════════════════════════════════════════════════════════════════
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: validate
+    # Gate: only for real releases; requires manual approval via Environment
+    environment: npm-publish
+    if: >
+      needs.validate.result == 'success' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.dry_run != true))
+
+    steps:
+      # ── Checkout with RELEASE_TOKEN so git push to protected main works ────
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          # Configures ~/.npmrc with NODE_AUTH_TOKEN for registry auth
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: packages
+
+      - name: Configure git identity
+        run: |
+          git config user.email "release-bot@async-kit.dev"
+          git config user.name "async-kit release bot"
+
+      # ── Version bump + changelog + git tag ────────────────────────────────
+      - name: nx release version + changelog
+        run: |
+          npx nx release \
+            --skip-publish \
+            ${{ inputs.first_release && '--first-release' || '' }} \
+            ${{ inputs.package && format('--projects={0}', inputs.package) || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Publish each package with OIDC provenance ─────────────────────────
+      - name: nx release publish
+        run: |
+          npx nx release publish \
+            ${{ inputs.package && format('--projects={0}', inputs.package) || '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'   # attaches OIDC-based supply-chain provenance
+
+      # ── Push version-bump commit + tags back to main ──────────────────────
+      - name: Push release commit and tags
+        run: |
+          git push --follow-tags origin HEAD:main
+
+      # ── Print published versions for the run summary ──────────────────────
+      - name: Summary
+        run: |
+          echo "## Published packages" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          for pkg in packages/*/package.json; do
+            name=$(node -p "require('./$pkg').name")
+            version=$(node -p "require('./$pkg').version")
+            echo "- \`${name}@${version}\` → https://www.npmjs.com/package/${name}" >> "$GITHUB_STEP_SUMMARY"
+          done

@@ -10,6 +10,11 @@ permissions:
   contents: read
   actions: read
 
+# Cancel superseded runs on the same branch / PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   main:
     name: NX Affected
@@ -30,6 +35,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Security audit
+        run: npm audit --audit-level=high
 
       - name: Restore NX cache
         uses: actions/cache@v4

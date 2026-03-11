@@ -543,18 +543,57 @@ npx nx run @async-kit/flowx:lint
 
 This monorepo uses [`nx release`](https://nx.dev/features/manage-releases) with **independent versioning** — each package can be on a different version.
 
-### How it works
+### Workflow overview
 
-1. Commit using [Conventional Commits](https://www.conventionalcommits.org/):
+```
+Push to main  ──────────────────────────────────────────────────────────────►
+                    ┌─────────────────────────────────────────────────────┐
+                    │  CI (ci.yml)                                        │
+                    │  npm audit → lint → typecheck → test → build        │
+                    └─────────────────────────────────────────────────────┘
+                                            │
+                         commit msg contains [release]?
+                                    │ yes
+                                    ▼
+                    ┌─────────────────────────────────────────────────────┐
+                    │  Release (release.yml)  — environment: npm-publish  │
+                    │  1. npm audit + full test + build                   │
+                    │  2. nx release --skip-publish  (bump + tag + log)   │
+                    │  3. nx release publish  (npm + OIDC provenance)     │
+                    │  4. git push --follow-tags → main                   │
+                    └─────────────────────────────────────────────────────┘
+
+Manual trigger:  Actions → Release → Run workflow
+                 Inputs: dry_run | package | first_release
+```
+
+### How to cut a release
+
+**Option A — Automated (recommended)**
+
+1. Write commits following [Conventional Commits](https://www.conventionalcommits.org/):
    ```
-   feat(retryx): add AbortSignal support
-   fix(limitx): drain() resolves correctly when queue is empty
-   feat!: rename Limiter to Limitx (BREAKING CHANGE)
+   feat(retryx): add decorrelated jitter strategy
+   fix(limitx): drain() resolves when queue empties mid-flight
+   feat!: drop Node 16 support (BREAKING CHANGE)
    ```
 
-2. Trigger the release workflow from GitHub Actions → **Release** → **Run workflow**
+2. When ready to publish, include `[release]` in any commit message pushed to `main`:
+   ```bash
+   git commit --allow-empty -m "chore: cut release [release]"
+   git push
+   ```
+   The workflow detects the marker, runs validation, then publishes.
 
-3. NX reads git history since the last tag, determines the version bump per package, updates `CHANGELOG.md`, creates git tags, and publishes to npm with [provenance](https://docs.npmjs.com/generating-provenance-statements).
+**Option B — Manual dispatch**
+
+Go to **Actions → Release → Run workflow** and fill in:
+
+| Input | Description |
+|---|---|
+| `dry_run` | Preview version bumps + changelog without publishing |
+| `package` | Scope to one package, e.g. `@async-kit/limitx` |
+| `first_release` | Use for the very first publish (`--first-release`) |
 
 ### Version bump rules
 
@@ -563,7 +602,7 @@ This monorepo uses [`nx release`](https://nx.dev/features/manage-releases) with 
 | `fix:` | patch |
 | `feat:` | minor |
 | `feat!:` or `BREAKING CHANGE:` | major |
-| `docs:`, `chore:`, `ci:`, `build:` | none |
+| `docs:`, `chore:`, `ci:`, `build:` | none (no release) |
 
 ### Git tags produced
 
@@ -574,14 +613,38 @@ This monorepo uses [`nx release`](https://nx.dev/features/manage-releases) with 
 @async-kit/ratelimitx@1.0.1
 ```
 
-### Required GitHub secrets
+### One-time setup — required secrets & environment
 
-| Secret | Description |
+#### 1. Secrets  (`Settings → Secrets and variables → Actions`)
+
+| Secret | How to get it |
 |---|---|
-| `NPM_TOKEN` | npm automation token (from npmjs.com → Access Tokens) |
-| `RELEASE_TOKEN` | GitHub PAT with `repo` scope (for pushing to protected `main`) |
+| `NPM_TOKEN` | npmjs.com → **Avatar → Access Tokens → Generate New Token → Automation** |
+| `RELEASE_TOKEN` | GitHub → **Settings → Developer settings → Personal access tokens (classic)** — scopes: `repo`, `workflow` |
 
-Create a **`npm-publish` GitHub Environment** with required reviewers to gate every publish behind a manual approval step.
+#### 2. GitHub Environment  (`Settings → Environments → New environment`)
+
+Create an environment named **`npm-publish`** and add:
+- **Required reviewers** — at least one team member who must approve before every publish
+- *(Optional)* **Deployment branches** — restrict to `main` only
+
+This gates every real publish behind a human sign-off. Dry-run jobs bypass the environment intentionally.
+
+#### 3. Verify OIDC provenance is enabled
+
+In your npm organisation:
+**npmjs.com → Organisation → Settings → Publishing → Require two-factor authentication for publish**
+and ensure **"Allow publishing with granular tokens"** is on.
+
+Provenance is attached automatically via `NPM_CONFIG_PROVENANCE=true` in the workflow — no extra steps needed.
+
+### npm provenance
+
+Every published package includes a signed [provenance statement](https://docs.npmjs.com/generating-provenance-statements) linking the package to this exact commit and workflow run. Consumers can verify with:
+
+```bash
+npm audit signatures @async-kit/limitx
+```
 
 ---
 
