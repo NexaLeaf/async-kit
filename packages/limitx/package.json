@@ -1,8 +1,15 @@
 {
   "name": "@async-kit/limitx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Async scheduler with concurrency control and rate limiting for JavaScript/TypeScript",
-  "keywords": ["async", "concurrency", "scheduler", "throttle", "limit", "queue"],
+  "keywords": [
+    "async",
+    "concurrency",
+    "scheduler",
+    "throttle",
+    "limit",
+    "queue"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -25,7 +32,11 @@
       }
     }
   },
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
