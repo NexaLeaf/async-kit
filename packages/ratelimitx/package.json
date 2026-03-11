@@ -25,6 +25,9 @@
       }
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": ["dist", "README.md", "CHANGELOG.md"],
   "sideEffects": false,
   "scripts": {
