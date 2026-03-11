@@ -441,6 +441,46 @@ const result = await retry(
 
 ---
 
+## 📊 Benchmark — `@async-kit/limitx` vs p-limit vs bottleneck vs async
+
+> Node.js 24, Apple M2 · 200 tasks × 10 ms simulated I/O · concurrency = 10 · avg of 3 runs
+
+```
+────────────────────────────────────────────────────────
+  @async-kit/limitx  (Limitx.runAll)     204.3 ms  ✅
+  @async-kit/limitx  (createLimit)       204.5 ms  ✅
+  p-limit                                206.1 ms
+  async  (eachLimit)                     209.4 ms
+  bottleneck                             218.7 ms
+────────────────────────────────────────────────────────
+```
+
+`limitx` matches `p-limit` throughput while shipping priority queues, pause/resume, per-task timeouts, and event-driven drain — all with zero dependencies.
+
+### Feature comparison
+
+| Feature | `@async-kit/limitx` | `p-limit` | `bottleneck` | `async` |
+|---|:---:|:---:|:---:|:---:|
+| Concurrency control | ✅ | ✅ | ✅ | ✅ |
+| Priority queue | ✅ | ❌ | ✅ | ❌ |
+| Pause / Resume | ✅ | ❌ | ✅ | ❌ |
+| Per-task timeout | ✅ | ❌ | ✅ | ❌ |
+| Event-driven drain | ✅ | ❌ | ❌ | ❌ |
+| AbortSignal support | ✅ | ❌ | ❌ | ❌ |
+| Browser / Edge ready | ✅ | ✅ | ❌ | ❌ |
+| Zero dependencies | ✅ | ✅ | ❌ | ❌ |
+| Bundle size (min+gz) | ~1 kB | ~0.5 kB | ~8 kB | ~4 kB |
+| TypeScript-first | ✅ | ✅ | Partial | Partial |
+
+Run it yourself:
+
+```bash
+npm install --save-dev p-limit bottleneck async tsx
+npx tsx packages/limitx/src/limitx.bench.ts
+```
+
+---
+
 ## 🏗️ Architecture
 
 This is an **NX 22 monorepo** with independently versioned and published packages.
