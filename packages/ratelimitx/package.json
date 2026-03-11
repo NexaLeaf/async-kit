@@ -1,6 +1,6 @@
 {
   "name": "@async-kit/ratelimitx",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Token bucket and sliding window rate limiter for JavaScript/TypeScript",
   "keywords": [
     "rate-limit",
