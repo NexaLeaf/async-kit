@@ -61,7 +61,8 @@
     },
     "version": {
       "conventionalCommits": true,
-      "versionPrefix": ""
+      "versionPrefix": "",
+      "fallbackCurrentVersionResolver": "disk"
     },
     "changelog": {
       "projectChangelogs": {
