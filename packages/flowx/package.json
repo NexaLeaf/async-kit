@@ -1,6 +1,6 @@
 {
   "name": "@async-kit/flowx",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Composable async pipeline builder for JavaScript/TypeScript",
   "keywords": [
     "async",
