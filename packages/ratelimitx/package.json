@@ -12,10 +12,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/async-kit",
+    "url": "https://github.com/NexaLeaf/async-kit",
     "directory": "packages/ratelimitx"
   },
-  "homepage": "https://github.com/your-org/async-kit/tree/main/packages/ratelimitx#readme",
+  "homepage": "https://github.com/NexaLeaf/async-kit/tree/main/packages/ratelimitx#readme",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
