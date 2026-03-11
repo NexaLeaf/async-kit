@@ -1,6 +1,6 @@
 {
   "name": "@async-kit/limitx",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Async scheduler with concurrency control and rate limiting for JavaScript/TypeScript",
   "keywords": [
     "async",
