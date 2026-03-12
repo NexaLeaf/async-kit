@@ -26,6 +26,8 @@ interface QueueEntry {
   fn: () => void;
   priority: number;
   reject: (err: unknown) => void;
+  signal?: AbortSignal;
+  abortHandler?: () => void;
 }
 
 // ─── Core Class ─────────────────────────────────────────────────────────────
@@ -86,6 +88,12 @@ export class Limitx {
   run<T>(task: Task<T>, options?: RunOptions): Promise<T> {
     const priority = options?.priority ?? this.defaultPriority;
     const timeoutMs = options?.timeoutMs;
+    const signal = options?.signal;
+
+    // Reject immediately if already aborted before even queuing
+    if (signal?.aborted) {
+      return Promise.reject(new LimitxAbortError('Task cancelled before queuing (signal already aborted)'));
+    }
 
     return new Promise<T>((resolve, reject) => {
       const execute = async (): Promise<void> => {
@@ -107,7 +115,22 @@ export class Limitx {
       if (!this.paused && this.running < this.concurrency) {
         void execute();
       } else {
-        this.enqueue({ fn: () => void execute(), priority, reject });
+        const entry: QueueEntry = { fn: () => void execute(), priority, reject, signal };
+
+        if (signal) {
+          // Cancel from the queue if the signal fires while the task is still waiting
+          entry.abortHandler = () => {
+            const idx = this.queue.indexOf(entry);
+            if (idx !== -1) {
+              this.queue.splice(idx, 1);
+              this.notifyDrain();
+            }
+            reject(new LimitxAbortError('Task cancelled via AbortSignal'));
+          };
+          signal.addEventListener('abort', entry.abortHandler, { once: true });
+        }
+
+        this.enqueue(entry);
       }
     });
   }
@@ -131,6 +154,7 @@ export class Limitx {
     for (let i = 0; i < slots; i++) {
       const entry = this.queue.shift();
       if (!entry) break;
+      if (entry.abortHandler) entry.signal!.removeEventListener('abort', entry.abortHandler);
       entry.fn();
     }
   }
@@ -144,6 +168,7 @@ export class Limitx {
     const count = this.queue.length;
     const err = new LimitxAbortError();
     for (const entry of this.queue) {
+      if (entry.abortHandler) entry.signal!.removeEventListener('abort', entry.abortHandler);
       entry.reject(err);
     }
     this.queue.length = 0;
@@ -153,13 +178,19 @@ export class Limitx {
   /**
    * Returns a Promise that resolves when all active and pending tasks finish.
    * Uses an event-driven approach — no `setTimeout` polling.
+   *
+   * Safe to call multiple times concurrently: all callers resolve together
+   * when the queue and active count both reach zero.
    */
   drain(): Promise<void> {
-    if (this.running === 0 && this.queue.length === 0) {
-      return Promise.resolve();
-    }
+    // Check inside the executor to avoid the TOCTOU race where the queue
+    // empties between the outer check and the push.
     return new Promise<void>((resolve) => {
-      this.drainWaiters.push(resolve);
+      if (this.running === 0 && this.queue.length === 0) {
+        resolve();
+      } else {
+        this.drainWaiters.push(resolve);
+      }
     });
   }
 
@@ -181,7 +212,10 @@ export class Limitx {
     this.notifyDrain();
     if (this.paused) return;
     const entry = this.queue.shift();
-    if (entry) entry.fn();
+    if (entry) {
+      if (entry.abortHandler) entry.signal!.removeEventListener('abort', entry.abortHandler);
+      entry.fn();
+    }
   }
 
   private notifyDrain(): void {

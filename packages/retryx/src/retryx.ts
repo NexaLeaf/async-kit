@@ -35,11 +35,15 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
       return;
     }
     const timer = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      'abort',
-      () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); },
-      { once: true }
-    );
+    const onAbort = () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    // Re-check after attaching listener to close the race window between the
+    // initial aborted check and addEventListener.
+    if (signal?.aborted) {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      reject(new DOMException('Aborted', 'AbortError'));
+    }
   });
 }
 
@@ -66,7 +70,12 @@ function computeDelay(
     case 'full':
       return Math.floor(Math.random() * cap);
     case 'decorrelated':
-      return Math.min(opts.maxDelay, Math.floor(opts.initialDelay + Math.random() * (prevDelay * 3 - opts.initialDelay)));
+      // AWS decorrelated jitter: sleep = min(cap, random(base, prev*3))
+      // Guard against negative range when prevDelay is very small.
+      return Math.min(
+        opts.maxDelay,
+        Math.floor(opts.initialDelay + Math.random() * (Math.max(opts.initialDelay, prevDelay * 3) - opts.initialDelay))
+      );
     case 'equal':
     default:
       return Math.floor(cap / 2 + Math.random() * (cap / 2));

@@ -1,0 +1,50 @@
+{
+  "name": "@async-kit/workflowx",
+  "version": "0.1.0",
+  "description": "Lightweight async workflow engine with sequential steps, parallel branches, conditional logic, per-step retry and timeout for JavaScript/TypeScript",
+  "keywords": [
+    "async",
+    "workflow",
+    "orchestration",
+    "steps",
+    "saga",
+    "pipeline",
+    "state-machine"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NexaLeaf/async-kit",
+    "directory": "packages/workflowx"
+  },
+  "homepage": "https://github.com/NexaLeaf/async-kit/tree/main/packages/workflowx#readme",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit"
+  },
+  "devDependencies": {}
+}

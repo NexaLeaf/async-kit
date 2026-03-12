@@ -316,6 +316,7 @@ export class FixedWindow {
   reset(): void {
     this.count = 0;
     this.windowStart = Date.now();
+    this.onWindowReset?.(this.windowStart);
   }
 }
 
@@ -363,9 +364,37 @@ export class CompositeLimiter {
 
   /** Waits for ALL limiters to have capacity, then acquires atomically. */
   async waitAndAcquire(signal?: AbortSignal): Promise<void> {
-    while (!this.tryAcquire()) {
+    while (true) {
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      await abortableDelay(1, signal);
+
+      // Try to acquire all — short circuit on first failure
+      const acquired: Limiter[] = [];
+      let waitMs = 0;
+
+      let allPassed = true;
+      for (const l of this.limiters) {
+        if (l.tryAcquire()) {
+          acquired.push(l);
+        } else {
+          allPassed = false;
+          // Compute how long this limiter needs: use acquire() to get retryAfterMs
+          // from the thrown RateLimitError; fall back to 1ms if unavailable.
+          try {
+            l.acquire();
+          } catch (err) {
+            if (err instanceof RateLimitError) {
+              waitMs = Math.max(waitMs, err.retryAfterMs || 1);
+            } else {
+              waitMs = Math.max(waitMs, 1);
+            }
+          }
+          break;
+        }
+      }
+
+      if (allPassed) return;
+
+      await abortableDelay(Math.max(1, waitMs), signal);
     }
   }
 }
