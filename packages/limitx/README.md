@@ -60,7 +60,7 @@ await limit.limiter.drain();
 | `.pause()` | `void` | Stop dequeuing (running tasks continue) |
 | `.resume()` | `void` | Resume dequeuing, fills available slots immediately |
 | `.clear()` | `number` | Cancel all queued tasks (rejects with `LimitxAbortError`), returns count |
-| `.drain()` | `Promise<void>` | Resolves when all active + pending tasks finish (event-driven, no polling) |
+| `.drain()` | `Promise<void>` | Resolves when all active + pending tasks finish (event-driven, no polling, safe to call concurrently) |
 | `.counts()` | `LimitxCounts` | Atomic snapshot: `{ active, pending, total }` |
 
 #### Getters
@@ -77,8 +77,11 @@ await limit.limiter.drain();
 interface RunOptions {
   priority?: number;   // Higher = runs sooner. Default: 0
   timeoutMs?: number;  // Throws LimitxTimeoutError if task exceeds this
+  signal?: AbortSignal; // Cancel while queued — rejects with LimitxAbortError
 }
 ```
+
+> **`signal` scope:** cancels the task only while it is **waiting in the queue**. Once a task starts executing, the signal has no effect on it. To cancel running work, pass the signal into the task itself.
 
 ### `createLimit(concurrency, options?)`
 
@@ -109,12 +112,46 @@ limiter.pause();             // stop dequeuing
 limiter.resume();            // fill slots immediately
 ```
 
+## AbortSignal Support
+
+Cancel a queued task before it starts executing:
+
+```typescript
+const controller = new AbortController();
+
+const promise = limiter.run(() => heavyTask(), {
+  priority: 5,
+  signal: controller.signal,
+});
+
+// Cancel while still queued
+controller.abort();
+
+try {
+  await promise;
+} catch (err) {
+  if (err instanceof LimitxAbortError) {
+    console.log('Task was cancelled before it started');
+  }
+}
+```
+
+You can also abort immediately if the signal is already aborted before `run()` is called:
+
+```typescript
+const ac = new AbortController();
+ac.abort(); // already aborted
+
+// Rejects synchronously with LimitxAbortError — never enters the queue
+await limiter.run(task, { signal: ac.signal });
+```
+
 ## Error Types
 
 | Class | When |
 |---|---|
 | `LimitxTimeoutError` | `timeoutMs` exceeded — has `.timeoutMs` |
-| `LimitxAbortError` | Task cancelled by `.clear()` |
+| `LimitxAbortError` | Task cancelled by `.clear()` or `RunOptions.signal` |
 
 ## Types
 

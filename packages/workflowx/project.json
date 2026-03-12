@@ -1,0 +1,27 @@
+{
+  "name": "@async-kit/workflowx",
+  "sourceRoot": "packages/workflowx/src",
+  "projectType": "library",
+  "tags": ["scope:workflowx", "type:lib"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": { "command": "../../node_modules/.bin/tsup", "cwd": "packages/workflowx" },
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "cache": true
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "../../node_modules/.bin/tsc -p tsconfig.lib.json --noEmit", "cwd": "packages/workflowx" },
+      "inputs": ["default", "^production"],
+      "cache": true
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm publish --access public", "cwd": "packages/workflowx" },
+      "dependsOn": ["build"]
+    }
+  }
+}

@@ -9,6 +9,12 @@ export interface RunOptions {
   priority?: number;
   /** Reject with `LimitxTimeoutError` if task takes longer than this. */
   timeoutMs?: number;
+  /**
+   * Cancel the task while it is still queued (waiting for a slot).
+   * If the signal fires before the task starts executing, it rejects with
+   * `LimitxAbortError`. Has no effect once the task is already running.
+   */
+  signal?: AbortSignal;
 }
 
 /** Constructor options for `Limitx`. */

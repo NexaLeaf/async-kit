@@ -17,6 +17,9 @@
 [![retryx](https://img.shields.io/npm/v/@async-kit/retryx?style=flat-square&label=%40async-kit%2Fretryx&color=4ECDC4&logo=npm)](https://www.npmjs.com/package/@async-kit/retryx)
 [![flowx](https://img.shields.io/npm/v/@async-kit/flowx?style=flat-square&label=%40async-kit%2Fflowx&color=45B7D1&logo=npm)](https://www.npmjs.com/package/@async-kit/flowx)
 [![ratelimitx](https://img.shields.io/npm/v/@async-kit/ratelimitx?style=flat-square&label=%40async-kit%2Fratelimitx&color=96CEB4&logo=npm)](https://www.npmjs.com/package/@async-kit/ratelimitx)
+[![cachex](https://img.shields.io/npm/v/@async-kit/cachex?style=flat-square&label=%40async-kit%2Fcachex&color=A78BFA&logo=npm)](https://www.npmjs.com/package/@async-kit/cachex)
+[![eventx](https://img.shields.io/npm/v/@async-kit/eventx?style=flat-square&label=%40async-kit%2Feventx&color=FB923C&logo=npm)](https://www.npmjs.com/package/@async-kit/eventx)
+[![workflowx](https://img.shields.io/npm/v/@async-kit/workflowx?style=flat-square&label=%40async-kit%2Fworkflowx&color=94A3B8&logo=npm)](https://www.npmjs.com/package/@async-kit/workflowx)
 
 <br/>
 
@@ -30,7 +33,10 @@ async-kit
  ├── 🔴  @async-kit/limitx       Priority queue, pause/resume, per-task timeouts, drain
  ├── 🟢  @async-kit/retryx       Retry + jitter strategies + CircuitBreaker + withRetry
  ├── 🔵  @async-kit/flowx        Type-safe pipeline, fallbacks, parallel, sequence
- └── 🟡  @async-kit/ratelimitx   Token Bucket + Sliding Window + Fixed Window + Composite
+ ├── 🟡  @async-kit/ratelimitx   Token Bucket + Sliding Window + Fixed Window + Composite
+ ├── 🟣  @async-kit/cachex        Smart async cache · TTL · stale-while-revalidate · LRU
+ ├── 🟠  @async-kit/eventx        Typed event bus · middleware · concurrency · AbortSignal
+ └── ⚪  @async-kit/workflowx     Workflow engine · steps · parallel · conditional · retry
 ```
 
 </div>
@@ -66,6 +72,26 @@ async-kit
 <sub>Token Bucket, Sliding Window, Fixed Window, and CompositeLimiter with retryAfterMs signals.</sub>
 </td>
 </tr>
+<tr>
+<td width="33%" align="center">
+<br/>
+<img src="https://img.shields.io/badge/-cachex-A78BFA?style=for-the-badge&labelColor=2d2d2d" /><br/>
+<b>Smart Cache</b><br/>
+<sub>TTL, request deduplication, stale-while-revalidate, LRU store, and tag invalidation.</sub>
+</td>
+<td width="33%" align="center">
+<br/>
+<img src="https://img.shields.io/badge/-eventx-FB923C?style=for-the-badge&labelColor=2d2d2d" /><br/>
+<b>Typed Event Bus</b><br/>
+<sub>Type-safe pub/sub, middleware, concurrency control, once subscriptions, and AbortSignal.</sub>
+</td>
+<td width="33%" align="center">
+<br/>
+<img src="https://img.shields.io/badge/-workflowx-94A3B8?style=for-the-badge&labelColor=2d2d2d" /><br/>
+<b>Workflow Engine</b><br/>
+<sub>Step sequencing, parallel branches, conditional steps, retry, timeout, and AbortSignal.</sub>
+</td>
+</tr>
 </table>
 
 ---
@@ -86,6 +112,15 @@ npm install @async-kit/flowx
 
 # Rate limiting
 npm install @async-kit/ratelimitx
+
+# Smart caching
+npm install @async-kit/cachex
+
+# Typed event bus
+npm install @async-kit/eventx
+
+# Workflow engine
+npm install @async-kit/workflowx
 ```
 
 ---
@@ -163,6 +198,21 @@ console.log('All done');
 | `defaultPriority` | `number` | `0` | Default priority (higher = sooner) |
 | `onError` | `(err) => void` | `undefined` | Called when a task throws |
 
+#### `RunOptions` — per-task
+
+| Option | Type | Description |
+|---|---|---|
+| `priority` | `number` | Queue position (higher runs first) |
+| `timeoutMs` | `number` | Throws `LimitxTimeoutError` if exceeded |
+| `signal` | `AbortSignal` | Cancel while **queued** — rejects with `LimitxAbortError` |
+
+```typescript
+// Cancel a queued task before it starts
+const ac = new AbortController();
+const promise = limiter.run(() => heavyTask(), { signal: ac.signal });
+ac.abort(); // rejects with LimitxAbortError if still waiting
+```
+
 ---
 
 ## 🟢 `@async-kit/retryx` — Smart Retry
@@ -202,7 +252,7 @@ await cb.run(() => callExternalService());
 |---|---|---|
 | `'equal'` (default) | `cap/2 + random(0, cap/2)` | General use, preserves mean |
 | `'full'` | `random(0, cap)` | AWS-recommended; highest spread |
-| `'decorrelated'` | `min(cap, random(base, prev*3))` | Aggressive thundering-herd prevention |
+| `'decorrelated'` | `min(maxDelay, random(base, max(base, prev×3)))` | Aggressive thundering-herd prevention |
 | `'none'` | `cap` | Deterministic testing |
 
 ### Usage Examples
@@ -392,6 +442,8 @@ await limiter.waitAndAcquire();
 const data = await callExternalApi();
 ```
 
+> `waitAndAcquire` sleeps for the **actual `retryAfterMs`** of whichever limiter is blocking — no busy-poll.
+
 **Express middleware — per-IP rate limiting:**
 
 ```typescript
@@ -499,7 +551,10 @@ async-kit/
 │   │   └── package.json
 │   ├── retryx/          ← @async-kit/retryx
 │   ├── flowx/           ← @async-kit/flowx
-│   └── ratelimitx/      ← @async-kit/ratelimitx
+│   ├── ratelimitx/      ← @async-kit/ratelimitx
+│   ├── cachex/          ← @async-kit/cachex
+│   ├── eventx/          ← @async-kit/eventx
+│   └── workflowx/       ← @async-kit/workflowx
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml       ← nx affected lint/test/build on PRs
@@ -679,7 +734,7 @@ npm audit signatures @async-kit/limitx
 | **Tree-shakeable** | `"sideEffects": false` + named exports only |
 | **Dual module** | ESM (`import`) + CJS (`require`) in every package |
 | **Fully typed** | Strict TypeScript, no `any` in public API |
-| **Cancellable** | `AbortSignal` support where applicable |
+| **Cancellable** | `AbortSignal` support in all 4 packages — cancel queued tasks (limitx), retry delays (retryx), pipeline steps (flowx), and rate-limit waits (ratelimitx) |
 | **Observable** | Hooks (`onRetry`, `onStepComplete`, `onError`) for logging/metrics |
 | **Tested** | 86 unit tests across 4 packages, `@swc/jest` for fast runs |
 | **Supply chain secure** | npm provenance on every publish, OIDC-based, no token storage |

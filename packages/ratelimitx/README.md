@@ -104,9 +104,11 @@ const fw = new FixedWindow({
 | `.tryAcquire()` | Non-blocking; `true` if under limit |
 | `.acquire()` | Throws `RateLimitError` if at limit |
 | `.waitAndAcquire(signal?)` | Async — waits until the window resets |
-| `.reset()` | Manually reset count (useful in tests) |
+| `.reset()` | Manually reset count + fires `onWindowReset` callback |
 | `.currentCount` | Requests in current window |
 | `.windowResetMs` | Ms remaining until the window resets |
+
+> **`reset()` fires `onWindowReset`** — the callback is called on both automatic resets and manual `.reset()` calls, keeping monitoring/UI state consistent.
 
 ### `CompositeLimiter`
 
@@ -124,7 +126,9 @@ const limiter = new CompositeLimiter([
 |---|---|
 | `.tryAcquire()` | `true` only if **all** limiters pass |
 | `.acquire()` | Throws on the first limiter that rejects |
-| `.waitAndAcquire(signal?)` | Async — waits until all limiters have capacity |
+| `.waitAndAcquire(signal?)` | Async — sleeps for the actual `retryAfterMs` of the blocking limiter (no busy-poll) |
+
+> **Smart wait:** `waitAndAcquire` reads `RateLimitError.retryAfterMs` from whichever limiter blocks and sleeps exactly that long — no 1 ms polling loop.
 
 ### `RateLimitError`
 

@@ -181,7 +181,12 @@ export class Pipeline<TIn, TOut> {
         const nextRecord = this.records[i + 1];
         if (nextRecord?.isFallback) {
           const pipelineErr = new PipelineStepError(stepIndex, record.name, err, inputValue);
-          current = await nextRecord.fn(pipelineErr, inputValue);
+          try {
+            current = await nextRecord.fn(pipelineErr, inputValue);
+          } catch (fallbackErr) {
+            // Fallback itself threw — wrap so callers can distinguish it
+            throw new PipelineStepError(stepIndex, record.name, fallbackErr, inputValue);
+          }
           i++; // skip the fallback record in the outer loop
           onStepComplete?.(stepIndex, record.name, current);
         } else {

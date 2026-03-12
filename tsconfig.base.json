@@ -22,7 +22,10 @@
       "@async-kit/limitx": ["packages/limitx/src/index.ts"],
       "@async-kit/retryx": ["packages/retryx/src/index.ts"],
       "@async-kit/flowx": ["packages/flowx/src/index.ts"],
-      "@async-kit/ratelimitx": ["packages/ratelimitx/src/index.ts"]
+      "@async-kit/ratelimitx": ["packages/ratelimitx/src/index.ts"],
+      "@async-kit/cachex": ["packages/cachex/src/index.ts"],
+      "@async-kit/eventx": ["packages/eventx/src/index.ts"],
+      "@async-kit/workflowx": ["packages/workflowx/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp", "dist", "**/*.js"]

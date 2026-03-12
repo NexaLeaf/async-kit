@@ -114,6 +114,23 @@ const result = await pipeline<string>()
 // → { raw: 'invalid json', error: SyntaxError }
 ```
 
+If the **fallback itself throws**, the error is wrapped in `PipelineStepError` (same as a normal step error) so you always get a consistent error type:
+
+```typescript
+try {
+  await pipeline<string>()
+    .pipeWithFallback(
+      { name: 'fetch', fn: s => primaryApi.get(s) },
+      (_err, id) => fallbackApi.get(id) // this might also fail
+    )
+    .run(userId);
+} catch (err) {
+  if (err instanceof PipelineStepError) {
+    console.log('step or fallback failed at step', err.stepIndex, err.cause);
+  }
+}
+```
+
 ## `parallel(tasks, options?)`
 
 Run tasks concurrently, resolve in declaration order. Rejects on first failure.
@@ -142,7 +159,7 @@ const total = await sequence(orders, 0, async (acc, order) => {
 
 | Class | When |
 |---|---|
-| `PipelineStepError` | A step threw — has `.stepIndex`, `.stepName`, `.cause`, `.inputValue` |
+| `PipelineStepError` | A step threw **or a fallback threw** — has `.stepIndex`, `.stepName`, `.cause`, `.inputValue` |
 | `PipelineTimeoutError` | Per-step timeout exceeded — has `.stepIndex`, `.stepName`, `.timeoutMs` |
 
 ## Examples

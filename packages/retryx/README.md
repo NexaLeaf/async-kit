@@ -71,8 +71,10 @@ const result = await cb.run(() => callExternalService());
 |---|---|---|
 | `'equal'` (default) | `cap/2 + random(0, cap/2)` | Preserves mean delay |
 | `'full'` | `random(0, cap)` | AWS-recommended; highest spread |
-| `'decorrelated'` | `min(cap, random(base, prev*3))` | Aggressive thundering-herd prevention |
+| `'decorrelated'` | `min(maxDelay, random(base, max(base, prev×3)))` | Aggressive thundering-herd prevention |
 | `'none'` | `cap` | Deterministic testing |
+
+> **`'decorrelated'` note:** The formula guards against a negative random range when `prevDelay` is very small by using `max(initialDelay, prevDelay × 3)` as the upper bound — delays are always ≥ `initialDelay`.
 
 ### `createRetry(defaults)`
 
