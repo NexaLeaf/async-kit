@@ -1,6 +1,6 @@
 {
   "name": "@async-kit/cachex",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Smart async cache with request deduplication, TTL, stale-while-revalidate, and pluggable storage for JavaScript/TypeScript",
   "keywords": [
     "async",

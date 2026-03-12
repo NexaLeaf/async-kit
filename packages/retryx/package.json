@@ -1,6 +1,6 @@
 {
   "name": "@async-kit/retryx",
-  "version": "0.1.26",
+  "version": "0.2.0",
   "description": "Smart async retry system with exponential backoff, jitter, and circuit breaker for JavaScript/TypeScript",
   "keywords": [
     "async",

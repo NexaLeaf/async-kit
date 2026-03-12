@@ -1,3 +1,13 @@
+## 0.2.0 (2026-03-12)
+
+### 🚀 Features
+
+- add cachex, eventx, and workflowx packages ([50277b9](https://github.com/NexaLeaf/async-kit/commit/50277b9))
+
+### ❤️ Thank You
+
+- Palanisamy Muthusamy
+
 
 
 
