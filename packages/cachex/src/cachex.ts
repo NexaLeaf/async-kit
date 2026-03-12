@@ -19,23 +19,15 @@ export class CachexError extends Error {
  * Default in-process store. Entries are stored as `CacheEntry<T>` objects so
  * TTL and tag metadata travel with the value.
  */
-export class MemoryStore<T> {
-  private readonly map = new Map<string, CacheEntry<T>>();
+export class MemoryStore<T> implements CacheStore<T> {
+  private readonly map = new Map<string, T>();
 
-  get(key: string): CacheEntry<T> | undefined {
+  get(key: string): T | undefined {
     return this.map.get(key);
   }
 
-  /** `set` stores the full entry — TTL enforcement is handled by Cachex. */
   set(key: string, value: T, _ttlMs: number): void {
-    // Entry wrapping happens in Cachex.set(); MemoryStore just holds it.
-    // We reach here only via the internal _rawSet which passes a CacheEntry.
-    void value; void _ttlMs;
-  }
-
-  /** Internal: stores the pre-built entry directly. */
-  _set(key: string, entry: CacheEntry<T>): void {
-    this.map.set(key, entry);
+    this.map.set(key, value);
   }
 
   delete(key: string): void {
@@ -48,7 +40,7 @@ export class MemoryStore<T> {
 
   deleteByTag(tag: string): void {
     for (const [key, entry] of this.map) {
-      if (entry.tags.includes(tag)) this.map.delete(key);
+      if ((entry as CacheEntry<unknown>).tags?.includes(tag)) this.map.delete(key);
     }
   }
 
@@ -63,14 +55,14 @@ export class MemoryStore<T> {
 /**
  * LRU memory store — evicts the least-recently-used entry when `maxSize` is exceeded.
  */
-export class LRUStore<T> {
-  private readonly cache = new Map<string, CacheEntry<T>>();
+export class LRUStore<T> implements CacheStore<T> {
+  private readonly cache = new Map<string, T>();
 
   constructor(private readonly maxSize: number) {
     if (maxSize < 1) throw new RangeError('LRUStore maxSize must be >= 1');
   }
 
-  get(key: string): CacheEntry<T> | undefined {
+  get(key: string): T | undefined {
     const entry = this.cache.get(key);
     if (!entry) return undefined;
     // Move to end (most recently used)
@@ -79,15 +71,13 @@ export class LRUStore<T> {
     return entry;
   }
 
-  set(_key: string, _value: T, _ttlMs: number): void { /* see _set */ }
-
-  _set(key: string, entry: CacheEntry<T>): void {
+  set(key: string, value: T, _ttlMs: number): void {
     if (this.cache.has(key)) this.cache.delete(key);
     else if (this.cache.size >= this.maxSize) {
       // Evict LRU (first entry)
       this.cache.delete(this.cache.keys().next().value as string);
     }
-    this.cache.set(key, entry);
+    this.cache.set(key, value);
   }
 
   delete(key: string): void { this.cache.delete(key); }
@@ -95,7 +85,7 @@ export class LRUStore<T> {
 
   deleteByTag(tag: string): void {
     for (const [key, entry] of this.cache) {
-      if (entry.tags.includes(tag)) this.cache.delete(key);
+      if ((entry as CacheEntry<unknown>).tags?.includes(tag)) this.cache.delete(key);
     }
   }
 
@@ -120,7 +110,7 @@ export class Cachex<TArgs extends unknown[], TReturn> {
   private readonly ttl: number;
   private readonly staleWhileRevalidate: boolean;
   private readonly keyResolver: KeyResolver<TArgs>;
-  private readonly store: MemoryStore<TReturn> | LRUStore<TReturn>;
+  private readonly store: CacheStore<CacheEntry<TReturn>>;
   private readonly tags: string[];
   private readonly onSet?: (key: string, value: TReturn) => void;
   private readonly onHit?: (key: string, stale: boolean) => void;
@@ -137,7 +127,7 @@ export class Cachex<TArgs extends unknown[], TReturn> {
     this.ttl = options.ttl ?? Infinity;
     this.staleWhileRevalidate = options.staleWhileRevalidate ?? false;
     this.keyResolver = options.keyResolver ?? ((...args) => JSON.stringify(args));
-    this.store = (options.store as MemoryStore<TReturn>) ?? new MemoryStore<TReturn>();
+    this.store = (options.store as unknown as CacheStore<CacheEntry<TReturn>>) ?? new MemoryStore<CacheEntry<TReturn>>();
     this.tags = options.tags ?? [];
     this.onSet = options.onSet;
     this.onHit = options.onHit;
@@ -148,7 +138,7 @@ export class Cachex<TArgs extends unknown[], TReturn> {
   /** Execute with cache — the primary API. */
   async call(...args: TArgs): Promise<TReturn> {
     const key = this.keyResolver(...args);
-    const entry = this._getEntry(key);
+    const entry = await this._getEntry(key);
     const now = Date.now();
 
     if (entry) {
@@ -183,7 +173,7 @@ export class Cachex<TArgs extends unknown[], TReturn> {
 
   /** Invalidate all entries sharing a tag. */
   invalidateTag(tag: string): void {
-    if (this.store.deleteByTag) this.store.deleteByTag(tag);
+    this.store.deleteByTag?.(tag);
   }
 
   /** Flush the entire cache. */
@@ -198,18 +188,17 @@ export class Cachex<TArgs extends unknown[], TReturn> {
 
   // ── Internal ───────────────────────────────────────────────────────────────
 
-  private _getEntry(key: string): CacheEntry<TReturn> | undefined {
-    // Both MemoryStore and LRUStore expose _set and get(key) → CacheEntry
-    return (this.store as MemoryStore<TReturn>).get(key) as CacheEntry<TReturn> | undefined;
+  private async _getEntry(key: string): Promise<CacheEntry<TReturn> | undefined> {
+    return this.store.get(key) as Promise<CacheEntry<TReturn> | undefined> | CacheEntry<TReturn> | undefined;
   }
 
-  private _setEntry(key: string, value: TReturn): void {
+  private async _setEntry(key: string, value: TReturn): Promise<void> {
     const entry: CacheEntry<TReturn> = {
       value,
       expiresAt: this.ttl === Infinity ? Infinity : Date.now() + this.ttl,
       tags: this.tags,
     };
-    (this.store as MemoryStore<TReturn>)._set(key, entry);
+    await this.store.set(key, entry, this.ttl);
     this._stats.stores++;
     this.onSet?.(key, value);
   }
@@ -219,8 +208,8 @@ export class Cachex<TArgs extends unknown[], TReturn> {
     const existing = this.inflight.get(key);
     if (existing) return existing;
 
-    const promise = this.fn(...args).then((value) => {
-      this._setEntry(key, value);
+    const promise = this.fn(...args).then(async (value) => {
+      await this._setEntry(key, value);
       return value;
     }).finally(() => {
       this.inflight.delete(key);

@@ -154,7 +154,7 @@ export class Workflow<TCtx extends WorkflowContext> {
 
         if (isParallel(node)) {
           options.onStepStart?.(i, 'parallel');
-          await this._runParallel(node, ctx, abortController.signal);
+          await this._runParallel(node, ctx, i, options);
           options.onStepComplete?.(i, 'parallel', Date.now() - stepStart);
         } else if (isConditional(node)) {
           const shouldRun = await node.predicate(ctx);
@@ -226,22 +226,13 @@ export class Workflow<TCtx extends WorkflowContext> {
   private async _runParallel(
     branch: ParallelBranch<TCtx>,
     ctx: TCtx,
-    signal: AbortSignal
+    index: number,
+    options: WorkflowRunOptions
   ): Promise<void> {
-    if (signal.aborted) throw new WorkflowAbortError(ctx.currentStep);
+    if (ctx.signal.aborted) throw new WorkflowAbortError(index);
 
     await Promise.all(
-      branch.steps.map(async (s) => {
-        const step = normalizeStep(s);
-        const result = await runWithTimeout(
-          () => Promise.resolve(step.fn(ctx)),
-          step.timeoutMs,
-          step.name
-        );
-        if (result !== undefined && result !== null) {
-          Object.assign(ctx, result);
-        }
-      })
+      branch.steps.map((s) => this._runStep(normalizeStep(s), ctx, index, options))
     );
   }
 }

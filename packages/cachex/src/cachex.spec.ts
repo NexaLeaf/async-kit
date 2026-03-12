@@ -1,33 +1,39 @@
 import { Cachex, cache, MemoryStore, LRUStore, CachexError } from './cachex';
+import type { CacheEntry } from './types';
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+// Helper: build a CacheEntry value for store unit tests
+function entry<T>(value: T, tags: string[] = []): CacheEntry<T> {
+  return { value, expiresAt: Infinity, tags };
+}
+
 describe('MemoryStore', () => {
   it('stores and retrieves entries', () => {
-    const store = new MemoryStore<number>();
-    store._set('k', { value: 42, expiresAt: Infinity, tags: [] });
+    const store = new MemoryStore<CacheEntry<number>>();
+    store.set('k', entry(42), 0);
     expect(store.get('k')?.value).toBe(42);
   });
 
   it('deletes entries', () => {
-    const store = new MemoryStore<number>();
-    store._set('k', { value: 1, expiresAt: Infinity, tags: [] });
+    const store = new MemoryStore<CacheEntry<number>>();
+    store.set('k', entry(1), 0);
     store.delete('k');
     expect(store.get('k')).toBeUndefined();
   });
 
   it('clears all entries', () => {
-    const store = new MemoryStore<number>();
-    store._set('a', { value: 1, expiresAt: Infinity, tags: [] });
-    store._set('b', { value: 2, expiresAt: Infinity, tags: [] });
+    const store = new MemoryStore<CacheEntry<number>>();
+    store.set('a', entry(1), 0);
+    store.set('b', entry(2), 0);
     store.clear();
     expect(store.size).toBe(0);
   });
 
   it('deleteByTag removes matching entries', () => {
-    const store = new MemoryStore<number>();
-    store._set('a', { value: 1, expiresAt: Infinity, tags: ['users'] });
-    store._set('b', { value: 2, expiresAt: Infinity, tags: ['orders'] });
+    const store = new MemoryStore<CacheEntry<number>>();
+    store.set('a', entry(1, ['users']), 0);
+    store.set('b', entry(2, ['orders']), 0);
     store.deleteByTag('users');
     expect(store.get('a')).toBeUndefined();
     expect(store.get('b')).toBeDefined();
@@ -40,10 +46,10 @@ describe('LRUStore', () => {
   });
 
   it('evicts LRU entry when full', () => {
-    const store = new LRUStore<number>(2);
-    store._set('a', { value: 1, expiresAt: Infinity, tags: [] });
-    store._set('b', { value: 2, expiresAt: Infinity, tags: [] });
-    store._set('c', { value: 3, expiresAt: Infinity, tags: [] });
+    const store = new LRUStore<CacheEntry<number>>(2);
+    store.set('a', entry(1), 0);
+    store.set('b', entry(2), 0);
+    store.set('c', entry(3), 0);
     expect(store.get('a')).toBeUndefined(); // evicted
     expect(store.get('b')).toBeDefined();
     expect(store.get('c')).toBeDefined();
@@ -51,19 +57,19 @@ describe('LRUStore', () => {
   });
 
   it('get refreshes recency', () => {
-    const store = new LRUStore<number>(2);
-    store._set('a', { value: 1, expiresAt: Infinity, tags: [] });
-    store._set('b', { value: 2, expiresAt: Infinity, tags: [] });
+    const store = new LRUStore<CacheEntry<number>>(2);
+    store.set('a', entry(1), 0);
+    store.set('b', entry(2), 0);
     store.get('a'); // refresh a
-    store._set('c', { value: 3, expiresAt: Infinity, tags: [] }); // evicts b
+    store.set('c', entry(3), 0); // evicts b
     expect(store.get('a')).toBeDefined();
     expect(store.get('b')).toBeUndefined();
   });
 
   it('deleteByTag removes matching entries', () => {
-    const store = new LRUStore<number>(5);
-    store._set('a', { value: 1, expiresAt: Infinity, tags: ['x'] });
-    store._set('b', { value: 2, expiresAt: Infinity, tags: ['y'] });
+    const store = new LRUStore<CacheEntry<number>>(5);
+    store.set('a', entry(1, ['x']), 0);
+    store.set('b', entry(2, ['y']), 0);
     store.deleteByTag('x');
     expect(store.get('a')).toBeUndefined();
     expect(store.get('b')).toBeDefined();

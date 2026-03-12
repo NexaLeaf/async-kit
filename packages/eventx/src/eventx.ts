@@ -69,6 +69,8 @@ export class EventBus<TEvents extends EventMap> {
       queue: [],
     };
 
+    if (sub.concurrency < 1) throw new RangeError('concurrency must be >= 1');
+
     if (!this.subs.has(event)) this.subs.set(event, new Set());
     (this.subs.get(event) as Set<Subscription<TEvents[K]>>).add(sub as unknown as Subscription<unknown>);
     this._stats.listeners++;

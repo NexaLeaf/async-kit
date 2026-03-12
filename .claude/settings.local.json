@@ -16,7 +16,8 @@
       "Bash(source ~/.nvm/nvm.sh && nvm use 24 && npx nx run-many -t build,test --all --parallel=4 2>&1 | grep -E \"\\(PASS|FAIL|✓|✗|Successfully|Error\\)\" | grep -v \"^$\")",
       "Bash(source ~/.nvm/nvm.sh && nvm use 24 && npm audit 2>&1 | tail -20)",
       "Bash(npm audit:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)"
     ]
   }
 }
